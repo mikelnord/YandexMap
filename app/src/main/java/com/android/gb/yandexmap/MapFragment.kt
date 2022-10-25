@@ -1,15 +1,20 @@
 package com.android.gb.yandexmap
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PointF
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.android.gb.util.requestLocationPermission
 import com.android.gb.yandexmap.databinding.FragmentMapBinding
 import com.yandex.mapkit.Animation
+import com.yandex.mapkit.MapKit
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.layers.ObjectEvent
@@ -30,6 +35,7 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
     private val binding get() = _binding!!
     private var userLocationLayer: UserLocationLayer? = null
     private var followUserLocation = false
+    private val REQUEST_LOCATION_PERMISSION = 1
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -38,38 +44,64 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
         MapKitFactory.setApiKey(MAPKIT_API_KEY)
         MapKitFactory.initialize(requireContext())
         _binding = FragmentMapBinding.inflate(inflater, container, false)
-
         requestLocationPermission(requireContext(), requireActivity())
         onMapReady()
+        val mapKit = MapKitFactory.getInstance()
         binding.userLocationFab.setOnClickListener {
-            cameraUserPosition()
-            followUserLocation = true
+            enableMyLocation(mapKit)
         }
-
         return binding.root
     }
 
 
+    private fun enableMyLocation(mapKit: MapKit) {
+        if (isPermissionGranted()) {
+            locationCreate(mapKit)
+        } else {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ),
+                REQUEST_LOCATION_PERMISSION
+            )
+        }
+    }
+
+    private fun locationCreate(mapKit: MapKit) {
+        if (userLocationLayer == null) {
+            userLocationLayer = mapKit.createUserLocationLayer(binding.mapView.mapWindow)
+            userLocationLayer?.isVisible = true
+            userLocationLayer?.isHeadingEnabled = true
+            userLocationLayer?.setObjectListener(this)
+        }
+        cameraUserPosition()
+        followUserLocation = true
+    }
+
+    private fun isPermissionGranted(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
     private fun onMapReady() {
-        val mapKit = MapKitFactory.getInstance()
-        userLocationLayer = mapKit.createUserLocationLayer(binding.map.mapWindow)
-        userLocationLayer?.isVisible = true
-        userLocationLayer?.isHeadingEnabled = true
-        userLocationLayer?.setObjectListener(this)
-        binding.map.map.addCameraListener(this)
+        binding.mapView.map.addCameraListener(this)
         cameraUserPosition()
     }
 
     private fun cameraUserPosition() {
         if (userLocationLayer?.cameraPosition() != null) {
             val routeStartLocation = userLocationLayer?.cameraPosition()?.target
-            binding.map.map.move(
+            binding.mapView.map.move(
                 CameraPosition(routeStartLocation!!, 16f, 0f, 0f),
                 Animation(Animation.Type.SMOOTH, 1f),
                 null
             )
         } else {
-            binding.map.map.move(CameraPosition(Point(0.0, 0.0), 16f, 0f, 0f))
+            binding.mapView.map.move(CameraPosition(Point(0.0, 0.0), 16f, 0f, 0f))
         }
     }
 
@@ -81,19 +113,18 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
 
     override fun onStart() {
         MapKitFactory.getInstance().onStart()
-        binding.map.onStart()
+        binding.mapView.onStart()
         super.onStart()
     }
 
     override fun onStop() {
         MapKitFactory.getInstance().onStop()
-        binding.map.onStop()
+        binding.mapView.onStop()
         super.onStop()
     }
 
     override fun onObjectAdded(userLocationView: UserLocationView) {
         setAnchor()
-
         userLocationView.pin.setIcon(
             ImageProvider.fromResource(
                 requireContext(),
@@ -106,13 +137,20 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
                 R.drawable.user_arrow
             )
         )
-        userLocationView.accuracyCircle.fillColor = Color.BLUE
+        //userLocationView.accuracyCircle.fillColor = Color.BLUE
+        userLocationView.accuracyCircle.fillColor = Color.BLUE and -0x66000001
     }
 
     private fun setAnchor() {
         userLocationLayer?.setAnchor(
-            PointF((binding.map.width * 0.5).toFloat(), (binding.map.height * 0.5).toFloat()),
-            PointF((binding.map.width * 0.5).toFloat(), (binding.map.height * 0.83).toFloat())
+            PointF(
+                (binding.mapView.width * 0.5).toFloat(),
+                (binding.mapView.height * 0.5).toFloat()
+            ),
+            PointF(
+                (binding.mapView.width * 0.5).toFloat(),
+                (binding.mapView.height * 0.83).toFloat()
+            )
         )
 
         binding.userLocationFab.setImageResource(R.drawable.ic_my_location_black_24dp)
@@ -122,7 +160,6 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
 
     private fun noAnchor() {
         userLocationLayer?.resetAnchor()
-
         binding.userLocationFab.setImageResource(R.drawable.ic_location_searching_black_24dp)
     }
 
