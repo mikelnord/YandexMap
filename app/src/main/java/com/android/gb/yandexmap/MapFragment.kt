@@ -18,9 +18,7 @@ import com.yandex.mapkit.MapKit
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.layers.ObjectEvent
-import com.yandex.mapkit.map.CameraListener
-import com.yandex.mapkit.map.CameraPosition
-import com.yandex.mapkit.map.CameraUpdateReason
+import com.yandex.mapkit.map.*
 import com.yandex.mapkit.map.Map
 import com.yandex.mapkit.user_location.UserLocationLayer
 import com.yandex.mapkit.user_location.UserLocationObjectListener
@@ -28,7 +26,7 @@ import com.yandex.mapkit.user_location.UserLocationView
 import com.yandex.runtime.image.ImageProvider
 
 
-class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
+class MapFragment : Fragment(), UserLocationObjectListener, CameraListener, InputListener {
 
     private val MAPKIT_API_KEY = "3655ebd3-6c47-4d75-8e99-f554672a0915"
     private var _binding: FragmentMapBinding? = null
@@ -88,6 +86,7 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
     }
 
     private fun onMapReady() {
+        binding.mapView.map.addInputListener(this)
         binding.mapView.map.addCameraListener(this)
         cameraUserPosition()
     }
@@ -137,7 +136,6 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
                 R.drawable.user_arrow
             )
         )
-        //userLocationView.accuracyCircle.fillColor = Color.BLUE
         userLocationView.accuracyCircle.fillColor = Color.BLUE and -0x66000001
     }
 
@@ -185,5 +183,19 @@ class MapFragment : Fragment(), UserLocationObjectListener, CameraListener {
                 noAnchor()
             }
         }
+    }
+
+    override fun onMapTap(p0: Map, p1: Point) {
+        val placemark = p0.mapObjects.addPlacemark(
+            p1,
+            ImageProvider.fromResource(requireContext(), R.drawable.mark)
+        )
+        placemark.isVisible = true
+        placemark.isDraggable = false
+
+    }
+
+    override fun onMapLongTap(p0: Map, p1: Point) {
+
     }
 }
